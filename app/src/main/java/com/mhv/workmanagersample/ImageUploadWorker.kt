@@ -16,9 +16,14 @@
 
 package com.mhv.workmanagersample
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.Build
+import android.support.v4.app.NotificationCompat
 import android.util.Log
 import androidx.work.Data
 import androidx.work.Worker
@@ -31,12 +36,31 @@ import javax.net.ssl.HttpsURLConnection
 
 class ImageUploadWorker : Worker() {
 
+    private var mNotificationId: Int = 0
+    private var mNotificationManager: NotificationManager? = null
+    private var mNotificationBuilder: NotificationCompat.Builder? = null
+
     override fun doWork(): Worker.Result {
         val imageUriInput: String?
         val args = inputData
         imageUriInput = args.getString(KEY_IMAGE_URI, null)
         val imageUri = Uri.parse(imageUriInput)
         val imageFile = File(imageUri.path)
+
+        mNotificationManager = applicationContext
+                .getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                    "upload_channel_id",
+                    "Upload Channel",
+                    NotificationManager.IMPORTANCE_DEFAULT
+            )
+
+            mNotificationManager!!.createNotificationChannel(channel)
+        }
+
+        notifyTaskStarted()
 
         // TODO: Actual upload. Currently are using the mockUpload to test
         /*try {
@@ -70,9 +94,12 @@ class ImageUploadWorker : Worker() {
             outputData = Data.Builder()
                     .putString(KEY_IMAGE_URI, successMessage)
                     .build()
+
+            mNotificationManager!!.cancel(mNotificationId)
             Worker.Result.SUCCESS
         } else {
             // The user should retry if they wish
+            notifyTaskError()
             Worker.Result.FAILURE
         }
     }
@@ -83,7 +110,7 @@ class ImageUploadWorker : Worker() {
                 val progress = i * 10
                 // TODO: Update notification
                 Log.d(TAG, "Upload progress: $progress")
-                // notifyTaskProgress(100, progress);
+                notifyTaskProgress(100, progress.toLong());
                 Thread.sleep(1000)
             }
             return RestResponse(HttpsURLConnection.HTTP_OK, "OK")
@@ -140,8 +167,7 @@ class ImageUploadWorker : Worker() {
             uploadedBytes += bytesRead.toLong()
             val newNotification = (uploadedBytes.toDouble() * notificationNumber.toDouble() * 1.0 / totalBytes).toInt()
             if (newNotification != currentNotification) {
-                // TODO: Update notification
-                // notifyTaskProgress(totalBytes, uploadedBytes);
+                notifyTaskProgress(totalBytes, uploadedBytes);
                 currentNotification = newNotification
             }
         }
@@ -155,8 +181,56 @@ class ImageUploadWorker : Worker() {
         return RestResponse(connection.responseCode, connection.responseMessage)
     }
 
-    companion object {
+    private fun notifyTaskStarted() {
+        Log.d(TAG, "Building notification with Id: $mNotificationId")
 
-        private val TAG = "ImageUploadWorker"
+        mNotificationBuilder = NotificationCompat.Builder(applicationContext, "upload_channel_id")
+                .setWhen(System.currentTimeMillis())
+                .setGroup("upload_notification_group")
+                .setOnlyAlertOnce(true)
+                .setContentTitle("Upload")
+                .setContentText("Starting upload...")
+                .setSmallIcon(android.R.drawable.ic_dialog_alert)
+                .setProgress(100, 0, true)
+                .setAutoCancel(true)
+                .setOngoing(true)
+
+        mNotificationManager!!.notify(mNotificationId, mNotificationBuilder!!.build())
+    }
+
+    private fun notifyTaskProgress(totalBytes: Long, uploadedBytes: Long) {
+        mNotificationBuilder!!
+                .setOnlyAlertOnce(true)
+                .setContentTitle("Upload")
+                .setContentText("Upload in progress")
+                .setProgress(totalBytes.toInt(), uploadedBytes.toInt(), false)
+                .setOngoing(true)
+
+        mNotificationManager!!.notify(mNotificationId, mNotificationBuilder!!.build())
+    }
+
+    fun notifyTaskCancelled() {
+        Log.d(TAG, "Upload has been cancelled!")
+        mNotificationManager!!.cancel(mNotificationId)
+    }
+
+    private fun notifyTaskError() {
+        Log.d(TAG, "An error has occurred while uploading")
+        mNotificationManager!!.cancel(mNotificationId)
+
+        val notificationBuilder = NotificationCompat.Builder(applicationContext, "upload_channel_id")
+                .setWhen(System.currentTimeMillis())
+                .setContentTitle("Upload")
+                .setContentText("Error while uploading")
+                .setSmallIcon(android.R.drawable.ic_dialog_alert)
+                .setOngoing(false)
+
+        // This is needed because the main notification used to show progress is ongoing
+        // and a new one has to be created to allow the user to dismiss it.
+        mNotificationManager!!.notify(mNotificationId + 1, notificationBuilder.build())
+    }
+
+    companion object {
+        private const val TAG = "ImageUploadWorker"
     }
 }
