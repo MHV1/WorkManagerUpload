@@ -41,4 +41,6 @@ dependencies {
     implementation "android.arch.work:work-runtime:$work_version"
     implementation "android.arch.work:work-firebase:$work_version"
     androidTestImplementation "android.arch.work:work-testing:$work_version"
+
+    implementation "com.android.support:exifinterface:27.1.1"
 }

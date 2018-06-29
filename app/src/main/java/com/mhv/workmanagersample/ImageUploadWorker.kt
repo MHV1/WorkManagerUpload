@@ -39,7 +39,7 @@ class ImageUploadWorker : Worker() {
 
     override fun doWork(): Worker.Result {
         val inputUri = inputData.getString(KEY_IMAGE_URI, "")
-        Log.d(TAG, "Uploading image: " + inputUri.toString())
+        Log.d(TAG, "Uploading image: $inputUri")
 
         if (inputUri.isNullOrEmpty()) {
             Log.e(TAG, "Invalid or null image URI")
