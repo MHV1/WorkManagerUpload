@@ -132,7 +132,6 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        Toast.makeText(this, "Image selected: " + imageUri.toString(), Toast.LENGTH_SHORT).show()
         viewModel.upload(imageUri.toString())
     }
 

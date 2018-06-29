@@ -29,23 +29,26 @@ class UploadViewModel : ViewModel() {
         get() = mWorkManager!!.getStatusesByTag(TAG_OUTPUT)
 
     fun upload(imageUri: String) {
-        val constraints = Constraints.Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)
-                .build()
+        Log.d(TAG, "upload($imageUri)")
 
-        val data = Data.Builder()
-                .putString(KEY_IMAGE_URI, imageUri)
-                .build()
+        val inputData = Data.Builder()
+                .putString(KEY_IMAGE_URI, imageUri).build()
+
+        val optimize = OneTimeWorkRequest.Builder(ImageOptimizingWorker::class.java)
+                .setInputData(inputData).build()
+
+        var continuation = mWorkManager!!
+                .beginUniqueWork(IMAGE_MAIN_WORK_NAME,
+                        ExistingWorkPolicy.REPLACE, optimize)
 
         val upload = OneTimeWorkRequest.Builder(ImageUploadWorker::class.java)
-                .setInputData(data)
-                .addTag(TAG_OUTPUT)
-                .setConstraints(constraints)
-                .build()
+                .addTag(TAG_OUTPUT).build()
+        continuation = continuation.then(upload)
 
-        Log.d(TAG, "beginUniqueWork")
-        mWorkManager!!.beginUniqueWork(IMAGE_UPLOAD_WORK_NAME,
-                ExistingWorkPolicy.REPLACE, upload).enqueue()
+        val cleanup = OneTimeWorkRequest.Builder(CleanupWorker::class.java).build()
+        continuation = continuation.then(cleanup)
+
+        continuation.enqueue()
     }
 
     fun cancel() {

@@ -16,6 +16,10 @@
 
 package com.mhv.workmanagersample
 
-const val IMAGE_UPLOAD_WORK_NAME = "image_manipulation_work"
+const val IMAGE_MAIN_WORK_NAME = "image_main_work"
+const val IMAGE_UPLOAD_WORK_NAME = "image_upload_work"
+
 const val KEY_IMAGE_URI = "KEY_IMAGE_URI"
 const val TAG_OUTPUT = "OUTPUT"
+
+const val OUTPUT_PATH = "img_optimize_outputs"

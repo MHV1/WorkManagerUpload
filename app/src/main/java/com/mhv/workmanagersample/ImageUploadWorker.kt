@@ -27,10 +27,7 @@ import android.support.v4.app.NotificationCompat
 import android.util.Log
 import androidx.work.Data
 import androidx.work.Worker
-import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
-import java.io.File
-import java.io.IOException
+import java.io.*
 import java.net.URL
 import javax.net.ssl.HttpsURLConnection
 
@@ -41,10 +38,15 @@ class ImageUploadWorker : Worker() {
     private var mNotificationBuilder: NotificationCompat.Builder? = null
 
     override fun doWork(): Worker.Result {
-        val imageUriInput: String?
-        val args = inputData
-        imageUriInput = args.getString(KEY_IMAGE_URI, null)
-        val imageUri = Uri.parse(imageUriInput)
+        val inputUri = inputData.getString(KEY_IMAGE_URI, "")
+        Log.d(TAG, "Uploading image: " + inputUri.toString())
+
+        if (inputUri.isNullOrEmpty()) {
+            Log.e(TAG, "Invalid or null image URI")
+            return Result.FAILURE
+        }
+
+        val imageUri = Uri.parse(inputUri)
         val imageFile = File(imageUri.path)
 
         mNotificationManager = applicationContext
@@ -62,26 +64,25 @@ class ImageUploadWorker : Worker() {
 
         notifyTaskStarted()
 
-        // TODO: Actual upload. Currently are using the mockUpload to test
         /*try {
-            final RestResponse response = upload(new URL(""), imageFile);
-            if (response != null && response.wasOk()) {
-                // TODO: This ideally will be the URL of the uploaded image location
-                String successMessage = response.getAsString();
+            val restResponse: RestResponse? = upload(URL(""), imageFile)
+            return if (restResponse != null && restResponse.wasOk()) {
+                val successMessage = restResponse.asString
 
-                // Set the result of the worker by calling setOutputData()
-                setOutputData(new Data.Builder()
-                        .putString(Constants.KEY_IMAGE_URI, successMessage)
+                outputData = Data.Builder()
+                        .putString(KEY_IMAGE_URI, successMessage)
                         .build()
-                );
-                return SUCCESS;
+
+                mNotificationManager!!.cancel(mNotificationId)
+                Result.SUCCESS
             } else {
-                // The user should retry if they wish
-                return FAILURE;
+                notifyTaskError()
+                Result.FAILURE
             }
-        } catch (IOException e) {
-            Log.e(TAG, "Error while attempting to upload image", e);
-            return FAILURE;
+        } catch (e: IOException) {
+            Log.e(TAG, "An error has occurred while uploading file")
+            notifyTaskError()
+            Result.FAILURE
         }*/
 
 
@@ -90,7 +91,6 @@ class ImageUploadWorker : Worker() {
             // TODO: This ideally will be the URL of the uploaded image location
             val successMessage = response.asString
 
-            // Set the result of the worker by calling setOutputData()
             outputData = Data.Builder()
                     .putString(KEY_IMAGE_URI, successMessage)
                     .build()
@@ -98,7 +98,6 @@ class ImageUploadWorker : Worker() {
             mNotificationManager!!.cancel(mNotificationId)
             Worker.Result.SUCCESS
         } else {
-            // The user should retry if they wish
             notifyTaskError()
             Worker.Result.FAILURE
         }
@@ -108,7 +107,6 @@ class ImageUploadWorker : Worker() {
         try {
             for (i in 1..9) {
                 val progress = i * 10
-                // TODO: Update notification
                 Log.d(TAG, "Upload progress: $progress")
                 notifyTaskProgress(100, progress.toLong());
                 Thread.sleep(1000)
@@ -127,19 +125,6 @@ class ImageUploadWorker : Worker() {
             return null
         }
 
-        // TODO: Do this scaling operation in another job and chain it with the upload one
-        val options = BitmapFactory.Options()
-        val originalBitmap = BitmapFactory.decodeFile(imageFile.absolutePath, options)
-
-        val scaledBitmap = Bitmap.createScaledBitmap(originalBitmap, 200, 200, false)
-
-        val byteArrayOutputStream = ByteArrayOutputStream()
-        scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 50, byteArrayOutputStream)
-
-        val compressedImageBytes = byteArrayOutputStream.toByteArray()
-        Log.d(TAG, "Image bytes - original: " + imageFile.length() + " compressed: "
-                + compressedImageBytes.size)
-
         val startTime = System.currentTimeMillis()
 
         Log.d(TAG, "Opening HTTP connection...")
@@ -152,22 +137,28 @@ class ImageUploadWorker : Worker() {
         Log.d(TAG, "Writing request body...")
         val outputStream = connection.outputStream
 
-        val inputStream = ByteArrayInputStream(compressedImageBytes)
-        val buffer = ByteArray(compressedImageBytes.size)
-        var bytesRead: Int
+        val maxBufferSize = 1 * 1024 * 1024
+
+        val inputStream = FileInputStream(imageFile)
+        val totalBytes = inputStream.available()
+        val buffer = ByteArray(Math.min(totalBytes, maxBufferSize))
+
         val notificationNumber = 20
         var currentNotification = 0
 
-        val totalBytes = compressedImageBytes.size.toLong()
+        var bytesRead: Int
         var uploadedBytes: Long = 0
 
         while (inputStream.read(buffer) != -1) {
             bytesRead = inputStream.read(buffer)
             outputStream.write(buffer, 0, bytesRead)
             uploadedBytes += bytesRead.toLong()
-            val newNotification = (uploadedBytes.toDouble() * notificationNumber.toDouble() * 1.0 / totalBytes).toInt()
+
+            val newNotification = (uploadedBytes.toDouble()
+                    * notificationNumber.toDouble() * 1.0 / totalBytes).toInt()
+
             if (newNotification != currentNotification) {
-                notifyTaskProgress(totalBytes, uploadedBytes);
+                notifyTaskProgress(totalBytes.toLong(), uploadedBytes);
                 currentNotification = newNotification
             }
         }
