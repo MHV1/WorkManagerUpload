@@ -37,8 +37,7 @@ class UploadViewModel : ViewModel() {
         val optimize = OneTimeWorkRequest.Builder(ImageOptimizingWorker::class.java)
                 .setInputData(inputData).build()
 
-        var continuation = mWorkManager!!
-                .beginUniqueWork(IMAGE_MAIN_WORK_NAME,
+        var continuation = mWorkManager!!.beginUniqueWork(IMAGE_MAIN_WORK_NAME,
                         ExistingWorkPolicy.REPLACE, optimize)
 
         val upload = OneTimeWorkRequest.Builder(ImageUploadWorker::class.java)
@@ -52,7 +51,7 @@ class UploadViewModel : ViewModel() {
     }
 
     fun cancel() {
-        mWorkManager!!.cancelUniqueWork(IMAGE_UPLOAD_WORK_NAME)
+        mWorkManager!!.cancelUniqueWork(IMAGE_MAIN_WORK_NAME)
     }
 
     companion object {

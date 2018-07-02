@@ -43,9 +43,9 @@ class ImageOptimizingWorker : Worker() {
                 resolver.openInputStream(Uri.parse(inputUri)))
 
         val resultUri = writeBitmapToFile(applicationContext, originalBitmap)
-        Log.d(TAG, "Image successfully optimized and saved: " + resultUri.toString())
+
         outputData = Data.Builder().putString(
-                KEY_IMAGE_URI, resultUri.toString()).build()
+                KEY_IMAGE_URI, resultUri).build()
 
         return Result.SUCCESS
     }
@@ -97,10 +97,7 @@ class ImageOptimizingWorker : Worker() {
     }
 
     private fun getResizedImageSize(imageFilePath: String, width: Int, height: Int): Long {
-        val options = BitmapFactory.Options()
-        val originalBitmap = BitmapFactory
-                .decodeFile(imageFilePath, options)
-
+        val originalBitmap = BitmapFactory.decodeFile(imageFilePath, BitmapFactory.Options())
         val scaledBitmap = Bitmap.createScaledBitmap(originalBitmap, width, height, false)
 
         val byteArrayOutputStream = ByteArrayOutputStream()
@@ -113,24 +110,28 @@ class ImageOptimizingWorker : Worker() {
     private fun getResizedImageDimens(originalWidth: Int, originalHeight: Int): IntArray {
         val resizedDimensions: IntArray
 
-        if (originalWidth > originalHeight) {
-            val resizedHeight = originalHeight.toDouble() / originalWidth.toDouble() * MAX_IMAGE_DIMENSION.toDouble()
-            resizedDimensions = intArrayOf(MAX_IMAGE_DIMENSION, resizedHeight.toInt())
+        resizedDimensions = when {
+            originalWidth > originalHeight -> {
+                val resizedHeight = originalHeight.toDouble() /
+                        originalWidth.toDouble() * MAX_IMAGE_DIMENSION.toDouble()
+                intArrayOf(MAX_IMAGE_DIMENSION, resizedHeight.toInt())
 
-        } else if (originalHeight > originalWidth) {
-            val resizedWidth = originalWidth.toDouble() / originalHeight.toDouble() * MAX_IMAGE_DIMENSION.toDouble()
-            resizedDimensions = intArrayOf(resizedWidth.toInt(), MAX_IMAGE_DIMENSION)
+            }
+            originalHeight > originalWidth -> {
+                val resizedWidth = originalWidth.toDouble() /
+                        originalHeight.toDouble() * MAX_IMAGE_DIMENSION.toDouble()
+                intArrayOf(resizedWidth.toInt(), MAX_IMAGE_DIMENSION)
 
-        } else {
-            resizedDimensions = intArrayOf(MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION)
+            }
+            else -> intArrayOf(MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION)
         }
 
         return resizedDimensions
     }
 
     @Throws(FileNotFoundException::class)
-    private fun writeBitmapToFile(applicationContext: Context, bitmap: Bitmap): Uri {
-        val name = String.format("image-optimize-output-%s.jpg", UUID.randomUUID().toString())
+    private fun writeBitmapToFile(applicationContext: Context, bitmap: Bitmap): String {
+        val name = String.format("%s.jpg", UUID.randomUUID().toString())
         val outputDir = File(applicationContext.filesDir, OUTPUT_PATH)
 
         if (!outputDir.exists()) {
@@ -165,12 +166,12 @@ class ImageOptimizingWorker : Worker() {
             if (out != null) {
                 try {
                     out.close()
-                } catch (ignore: IOException) {
-                }
+                } catch (ignore: IOException) {}
             }
         }
 
-        return Uri.fromFile(outputFile)
+        Log.d(TAG, "Image successfully optimized and saved: " + Uri.fromFile(outputFile).toString())
+        return Uri.fromFile(outputFile).toString()
     }
 
     companion object {

@@ -19,15 +19,15 @@ package com.mhv.workmanagersample
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.support.v4.app.NotificationCompat
 import android.util.Log
 import androidx.work.Data
 import androidx.work.Worker
-import java.io.*
+import java.io.File
+import java.io.FileInputStream
+import java.io.IOException
 import java.net.URL
 import javax.net.ssl.HttpsURLConnection
 
@@ -85,10 +85,8 @@ class ImageUploadWorker : Worker() {
             Result.FAILURE
         }*/
 
-
         val response = mockUpload()
         return if (response != null && response.wasOk()) {
-            // TODO: This ideally will be the URL of the uploaded image location
             val successMessage = response.asString
 
             outputData = Data.Builder()
@@ -98,25 +96,32 @@ class ImageUploadWorker : Worker() {
             mNotificationManager!!.cancel(mNotificationId)
             Worker.Result.SUCCESS
         } else {
-            notifyTaskError()
-            Worker.Result.FAILURE
+            if (isCancelled) {
+                Worker.Result.FAILURE
+            } else{
+                notifyTaskError()
+                Worker.Result.FAILURE
+            }
         }
     }
 
     private fun mockUpload(): RestResponse? {
-        try {
+        Log.d(TAG, "mockUpload")
+        return try {
             for (i in 1..9) {
                 val progress = i * 10
                 Log.d(TAG, "Upload progress: $progress")
                 notifyTaskProgress(100, progress.toLong());
+                if (isCancelled) {
+                    notifyTaskCancelled()
+                    throw InterruptedException()
+                }
                 Thread.sleep(1000)
             }
-            return RestResponse(HttpsURLConnection.HTTP_OK, "OK")
+            RestResponse(HttpsURLConnection.HTTP_OK, "OK")
         } catch (e: InterruptedException) {
-            e.printStackTrace()
-            return null
+            null
         }
-
     }
 
     @Throws(IOException::class)

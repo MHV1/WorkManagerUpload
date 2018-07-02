@@ -18,8 +18,11 @@ package com.mhv.workmanagersample
 
 import android.Manifest
 import android.app.Activity
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.arch.lifecycle.Observer
 import android.arch.lifecycle.ViewModelProviders
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -57,8 +60,8 @@ class MainActivity : AppCompatActivity() {
                 Log.d(TAG, "Work ongoing...")
             } else {
                 val outputData = status.outputData
-                val output = outputData.getString(KEY_IMAGE_URI, null)
-                Log.d(TAG, "Work successful: " + output!!)
+                val output: String? = outputData.getString(KEY_IMAGE_URI, null)
+                Log.d(TAG, "Work successful: $output")
             }
         })
 
@@ -75,6 +78,10 @@ class MainActivity : AppCompatActivity() {
             val chooseIntent = Intent(Intent.ACTION_PICK,
                     MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
             startActivityForResult(chooseIntent, REQUEST_CODE_IMAGE)
+        }
+
+        cancel_upload_button.setOnClickListener {
+            viewModel.cancel()
         }
     }
 
@@ -108,7 +115,8 @@ class MainActivity : AppCompatActivity() {
                 mPermissionRequestCount += 1
                 ActivityCompat.requestPermissions(this,
                         sPermissions.toTypedArray(),
-                        REQUEST_CODE_PERMISSIONS)
+                        REQUEST_CODE_PERMISSIONS
+                )
             } else {
                 Toast.makeText(this, """Go to Settings -> Apps and Notifications
                     -> WorkManagerUpload -> App Permissions and grant access to Storage.""",
@@ -138,8 +146,9 @@ class MainActivity : AppCompatActivity() {
     private fun checkAllPermissions(): Boolean {
         var hasPermissions = true
         for (permission in sPermissions) {
-            hasPermissions = hasPermissions and (ContextCompat.checkSelfPermission(
-                    this, permission) == PackageManager.PERMISSION_GRANTED)
+            hasPermissions = hasPermissions and
+                    (ContextCompat.checkSelfPermission(this, permission)
+                            == PackageManager.PERMISSION_GRANTED)
         }
         return hasPermissions
     }
